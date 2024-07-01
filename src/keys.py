@@ -132,7 +132,7 @@ class Shortcut_Store:
                 str = json.dumps(obj.__dict__)
                 json_file.writelines(str + "\n")
 
-        with open("shortcuts.json", "w") as json_file:
+        with open(SHORTCUTS_FILE, "w") as json_file:
             for sc in self.store:
                 obj_convert(sc)
 
@@ -140,7 +140,7 @@ class Shortcut_Store:
 class Code_Key_Mapping:
     def __init__(self, code, key):
         self.code = code
-        self.key = key
+        self.key = key 
 
     def __eq__(self, other):
         if self.code == other.code and self.key == other.key:
@@ -151,11 +151,11 @@ class Code_Key_Mapping:
 
 class Key_Rerouter:
     def __init__(self, store):
-        self.key_codes_to_names = dict()
         self.saved_shortcuts = [sc.hotkey for sc in store]
-        self.init_keyboard_listener()
         self.code_key_mapping = dict()
         self.load_key_code_to_name_mapping()
+        self.init_keyboard_listener()
+
 
     def load_key_code_to_name_mapping(self):
         if os.path.isfile(CODE_TO_KEY_FILE):
@@ -168,25 +168,33 @@ class Key_Rerouter:
         else:
             pass
 
-    def check_pressed_keys(self, event):
-        self.key_codes_to_names[event.scan_code] = event.name
-        pressed_keys = "+".join(
-            self.key_codes_to_names[code] for code in keyboard._pressed_events
-        )
-        return pressed_keys
+    def keep_updated_for_context
 
-    def pressed_keys(e):  # FIXME:  !!!!!!!!!!
-        line = ",".join(str(code) for code in keyboard._pressed_events)
-        if line:
-            print(line)
-        else:
-            print("---")
-        return line
+    def save_key_code_to_name_mapping(self):
+        def obj_convert(obj):
+            str = json.dumps(obj.__dict__)
+            json_file.writelines(str + "\n")
+
+        with open(CODE_TO_KEY_FILE, "w") as json_file:
+            for key_mapping in self.code_key_mapping:
+                obj_convert(key_mapping)
+
+    def check_pressed_keys(self, event):
+        self.code_key_mapping[event.scan_code] = event.name
+        pressed_keys = "+".join(
+            self.code_key_mapping[code] for code in keyboard._pressed_events
+        )
+        if pressed_keys in self.saved_shortcuts:
+            # Redirect / Act on shortcut
+            print("Jackpot!!!!!!!!!!!!")
+        else: 
+            # Let flow through
+            pass
+        return pressed_keys
 
     def constantly_check_keys_for_hotkeys(self, event):
         pressed_keys = self.check_pressed_keys(event)
-        if pressed_keys in self.saved_shortcuts:
-            print("Jackpot!!!!!!!!!!!!")
+
 
     def init_keyboard_listener(self):
         self.callback = keyboard.hook(self.constantly_check_keys_for_hotkeys)
@@ -210,11 +218,13 @@ class Keypress:
 def pressed_keys(e):
     global currently_pressed
     global recorded
+    # key being released - record end
     if e.scan_code in currently_pressed and e.event_type == "up":
         key_event = currently_pressed[e.scan_code]
         key_event.end = e.time
         recorded.append(key_event)
         del currently_pressed[e.scan_code]
+    # Key pressed for first time
     else:
         currently_pressed[e.scan_code] = Keypress(e.scan_code, e.name, e.time)
 
