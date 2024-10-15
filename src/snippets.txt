@@ -1,0 +1,99 @@
+    # keyboard.restore_modifiers([])
+    # keyboard.release("ctrl")
+    # print("Checking if Control is pressed:", keyboard.is_pressed("ctrl"))
+    # print("Checking if f is pressed:", keyboard.is_pressed("f"))
+
+
+
+        # self.saved_shortcuts = [sc.hotkey for sc in store]
+        # self.code_key_mapping = dict()
+        # self.load_key_code_to_name_mapping()
+
+    # def run_delayed(hotkey, actions):
+    #     actions = actions.split(",")
+    #     print("hotkey:", hotkey)
+    #     for an_action in actions:
+    #         print(an_action)
+    #         keyboard.send(an_action)
+    #         time.sleep(0.5)
+
+    # def load_key_code_to_name_mapping(self):
+    #     if os.path.isfile(CODE_TO_KEY_FILE):
+    #         with open(CODE_TO_KEY_FILE) as json_file:
+    #             for line in json_file:
+    #                 mapping = json.loads(
+    #                     line, object_hook=lambda d: Code_Key_Mapping(**d)
+    #                 )
+    #                 self.code_key_mapping[mapping.code] = mapping.key
+    #     else:
+    #         pass
+
+
+    # def save_key_code_to_name_mapping(self):
+    #     def obj_convert(obj):
+    #         str = json.dumps(obj.__dict__)
+    #         json_file.writelines(str + "\n")
+
+    #     with open(CODE_TO_KEY_FILE, "w") as json_file:
+    #         for key_mapping in self.code_key_mapping:
+    #             obj_convert(key_mapping)
+
+    # def check_pressed_keys(self, event):
+    #     self.code_key_mapping[event.scan_code] = event.name
+    #     pressed_keys = "+".join(
+    #         self.code_key_mapping[code] for code in keyboard._pressed_events
+    #     )
+    #     if pressed_keys in self.saved_shortcuts:
+    #         # Redirect / Act on shortcut
+    #         print("Jackpot!!!!!!!!!!!!")
+    #     else:
+    #         # Let flow through
+    #         pass
+    #     return pressed_keys
+
+    # def constantly_check_keys_for_hotkeys(self, event):
+    #     pressed_keys = self.check_pressed_keys(event)
+
+
+    def custom_decoder(dct):
+        if "_type" not in dct:
+            return dct
+        type_ = dct["_type"]
+        data = dct["data"]
+        if type_ in globals():
+            cls = globals()[type_]
+            obj = cls.__new__(cls)
+            for k, v in data.items():
+                if isinstance(v, dict) and "_type" in v:
+                    setattr(obj, k, custom_decoder(v))
+                elif isinstance(v, list):
+                    setattr(
+                        obj,
+                        k,
+                        [
+                            custom_decoder(item)
+                            if isinstance(item, dict) and "_type" in item
+                            else item
+                            for item in v
+                        ],
+                    )
+                else:
+                    setattr(obj, k, v)
+            return obj
+        return dct
+
+
+
+# Define a callback function for key events
+# def on_key_event(event):
+#     """Get the app context"""
+#     active_app = get_active_window_executable()
+
+
+# def get_active_window_title_on_click():
+#     """Event based updates of app context"""
+#     # Register the callback function for key events
+#     keyboard.hook(on_key_event)
+
+#     # Block forever, keeping the program running
+#     keyboard.wait(hotkey="esc")

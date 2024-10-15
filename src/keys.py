@@ -1,137 +1,29 @@
-"""
-keyboard.press_and_release("shift+s, space")
+""" """
+# TODO: DIFF KEYBOARD SUPPORT / KEYBOARD TRANSLATION?
 
-keyboard.write("The quick brown fox jumps over the lazy dog.")
-
-keyboard.add_hotkey("ctrl+shift+a", print, args=("triggered", "hotkey"))
-
-# Press PAGE UP then PAGE DOWN to type "foobar".
-keyboard.add_hotkey("page up, page down", lambda: keyboard.write("foobar"))
-
-# Blocks until you press esc.
-keyboard.wait("esc")
-
-# Record events until 'esc' is pressed.
-recorded = keyboard.record(until="esc")
-# Then replay back at three times the speed.
-keyboard.play(recorded, speed_factor=3)
-
-# Type @@ then press space to replace with abbreviation.
-keyboard.add_abbreviation("@@", "my.long.email@example.com")
-
-# Block forever, like `while True`.
-keyboard.wait()
-"""
-
-"""
-event-type - down - means getting pressed 
-
-complete set of key defs 
-
-
-"""
-import jsons
-import json
 import os
 import sys
-import time
 import jsonpickle
 
-# import mouse
-import psutil
-import pygetwindow as gw
-from objexplore import explore
-
 import keyboard
-import active_app_windows as active_app_windows
+import windows
 
 sys.path.append("..")
 
 recorded = list()
 currently_pressed = dict()
 
-# explore(keyboard)
-
 path = os.getcwd()
-# os.path.dirname(__file__)
 SHORTCUTS_FILE = os.path.join(path, "shortcuts.json")
 CODE_TO_KEY_FILE = os.path.join(path, "code_to_key.json")
 __all__ = "Shortcut", "Shortcut_Store", "Key_Rerouter"
-ESC_HOTKEY = "strg+esc"
-
-
-# class CustomJsonEncoder(json.JSONEncoder):
-# class Pickler():
-#     """Implements recursive encoding of python class objects"""
-
-#     # def default(self, obj):
-#     #     # For objects / classes
-#     #     if hasattr(obj, "__dict__"):
-#     #         return {
-#     #             "_type": obj.__class__.__name__,
-#     #             "data": {
-#     #                 k: self.default(v) if hasattr(v, "__dict__") else v
-#     #                 for k, v in obj.__dict__.items()
-#     #             },
-#     #         }
-#     #     elif isinstance(obj, list):
-#     #         return [
-#     #             self.default(item) if hasattr(item, "__dict__") else item
-#     #             for item in obj
-#     #         ]
-#     #     elif isinstance(obj, dict):
-#     #         return {
-#     #             k: self.default(v) if hasattr(v, "__dict__") else v
-#     #             for k, v in obj.items()
-#     #         }
-#     #     return super().default(obj)
-
-#     def default(self,obj):
-#         encoded = jsonpickle.encode(obj)
-#         return encoded
-
-
-def custom_decoder(dct):
-    if "_type" not in dct:
-        return dct
-    type_ = dct["_type"]
-    data = dct["data"]
-    if type_ in globals():
-        cls = globals()[type_]
-        obj = cls.__new__(cls)
-        for k, v in data.items():
-            if isinstance(v, dict) and "_type" in v:
-                setattr(obj, k, custom_decoder(v))
-            elif isinstance(v, list):
-                setattr(
-                    obj,
-                    k,
-                    [
-                        custom_decoder(item)
-                        if isinstance(item, dict) and "_type" in item
-                        else item
-                        for item in v
-                    ],
-                )
-            else:
-                setattr(obj, k, v)
-        return obj
-    return dct
-
-
-# def custom_decoder(dct):
-#     if "_type" not in dct:
-#         return dct
-#     type_ = dct["_type"]
-#     if type_ in globals():
-#         cls = globals()[type_]
-#         obj = cls.__new__(cls)
-#         obj.__dict__.update(dct["data"])
-#         return obj
-#     return dct
+ESC_HOTKEY = "shift+esc"
+scan_to_key_dict = dict()
 
 
 class Shortcut:
+    """User Created Shortcut object"""
+
     def __init__(
         self, *, contexts, description, hotkey, action, events=None, name=None
     ):
@@ -153,6 +45,8 @@ class Shortcut:
 
 
 class Shortcut_Store:
+    """A store and appropriate methods for dealing with shortcuts."""
+
     def __init__(self):
         self.store = list()
         self.load_from_json()
@@ -164,17 +58,11 @@ class Shortcut_Store:
                     line = line.strip()
                     try:
                         shortcut = jsonpickle.decode(line)
-                        # shortcut = json.loads(line, object_hook=custom_decoder)
-                        # shortcut = jsons.loads(line, object_hook=lambda d: Shortcut(**d))
-                        # shortcut = jsons.load(line)
-                        # shortcut = jsons.loads(line, Shortcut)
                         self.store.append(shortcut)
-                    except:
-                        pass
+                    except Exception as E:
+                        print(f"Exception: {E}")
         else:
             pass
-
-        print("loaded from json")
 
     def store_to_list(self):
         listified = list()
@@ -193,7 +81,6 @@ class Shortcut_Store:
             "name": sc_list[2],
             "hotkey": sc_list[3],
             "action": sc_list[4],
-            # "events": sc_list[5],
         }
         new_shortcut = Shortcut(**sc_dict)
         return new_shortcut
@@ -216,16 +103,9 @@ class Shortcut_Store:
 
     def dump_to_json(self):
         def obj_convert(obj):
-            # if isinstance(obj, list):
-            #     for x in obj:
-            #         obj_convert(x)
-            # elif isinstance(obj, Shortcut):
-            # str = json.dumps(obj.__dict__)
-            # json_file.writelines(str + "\n")
             str = jsonpickle.encode(obj)
-            # str = json.dumps(obj, cls=CustomJsonEncoder)
-            # str = jsons.dumps(obj)
-            json_file.writelines(str + "\n")
+            if str:
+                json_file.writelines(str + "\n")
 
         with open(SHORTCUTS_FILE, "w") as json_file:
             for sc in self.store:
@@ -244,11 +124,25 @@ class Code_Key_Mapping:
             return False
 
 
+def hotkey_react(hk):
+    print(f"Hotkey: {hk.hotkey}")
+    [print("Event", x) for x in hk.events]
+    keyboard.play(hk.events, speed_factor=5)
+    keyboard.release("ctrl")
+    # keyboard.press_and_release("ctrl")
+
+
+def load_hotkey(hk):
+    keyboard.add_hotkey(
+        hk.hotkey,
+        lambda: hotkey_react(hk),
+        suppress=True,
+        trigger_on_release=True,
+    )
+
+
 class Key_Rerouter:
     def __init__(self, store):
-        # self.saved_shortcuts = [sc.hotkey for sc in store]
-        # self.code_key_mapping = dict()
-        # self.load_key_code_to_name_mapping()
         self.context: str = ""
         self.store = store
         self.current_hotkeys: list = list()
@@ -277,87 +171,32 @@ class Key_Rerouter:
         print("Mapping: =======================")
         for hotkey in self.filter_hotkeys_for_context():
             print(f"\tShortcut:{hotkey.hotkey} Action:{hotkey.action}")
-
-            # def run_delayed(hotkey, actions):
-            #     actions = actions.split(",")
-            #     print("hotkey:", hotkey)
-            #     for an_action in actions:
-            #         print(an_action)
-            #         keyboard.send(an_action)
-            #         time.sleep(0.5)
-
-            def hotkey_react():
-                print(f"Hotkey: {hotkey.hotkey}")
-                keyboard.restore_modifiers([])
-                keyboard.release("ctrl")
-                # print("Checking if Control is pressed:", keyboard.is_pressed("ctrl"))
-                # print("Checking if f is pressed:", keyboard.is_pressed("f"))
-                keyboard.play(hotkey.events, speed_factor=5)
-
-            keyboard.add_hotkey(
-                hotkey.hotkey,
-                hotkey_react,
-                suppress=True,
-                trigger_on_release=True,
-            )
-
+            load_hotkey(hotkey)
             self.current_hotkeys.append(hotkey.hotkey)
-
-    # def load_key_code_to_name_mapping(self):
-    #     if os.path.isfile(CODE_TO_KEY_FILE):
-    #         with open(CODE_TO_KEY_FILE) as json_file:
-    #             for line in json_file:
-    #                 mapping = json.loads(
-    #                     line, object_hook=lambda d: Code_Key_Mapping(**d)
-    #                 )
-    #                 self.code_key_mapping[mapping.code] = mapping.key
-    #     else:
-    #         pass
+        print("completed loading hotkeys")
 
     def keep_updated_for_context(self, e):
-        current_context = active_app_windows.get_active_window_executable()
+        current_context = windows.get_active_window_executable()
         if self.context != current_context:
             print(f"(New) Current Context: {current_context}")
             self.context = current_context
             self.load_context_hotkey_remaps()
 
-    # def save_key_code_to_name_mapping(self):
-    #     def obj_convert(obj):
-    #         str = json.dumps(obj.__dict__)
-    #         json_file.writelines(str + "\n")
-
-    #     with open(CODE_TO_KEY_FILE, "w") as json_file:
-    #         for key_mapping in self.code_key_mapping:
-    #             obj_convert(key_mapping)
-
-    # def check_pressed_keys(self, event):
-    #     self.code_key_mapping[event.scan_code] = event.name
-    #     pressed_keys = "+".join(
-    #         self.code_key_mapping[code] for code in keyboard._pressed_events
-    #     )
-    #     if pressed_keys in self.saved_shortcuts:
-    #         # Redirect / Act on shortcut
-    #         print("Jackpot!!!!!!!!!!!!")
-    #     else:
-    #         # Let flow through
-    #         pass
-    #     return pressed_keys
-
-    # def constantly_check_keys_for_hotkeys(self, event):
-    #     pressed_keys = self.check_pressed_keys(event)
+    def print_keys_pressed(self, e):
+        line = ",".join(str(code) for code in keyboard._pressed_events)
+        if line:
+            print("Currently pressed:", line)
+            print("Ctrl pressed:", keyboard.is_pressed("ctrl"))
 
     def init_keyboard_listener(self):
-        self.callback = keyboard.hook(self.keep_updated_for_context)
+        # blocking in a cycle checking context and updating hotkeys - until esc hotkey
+        keyboard.hook(self.keep_updated_for_context)
+        keyboard.hook(self.print_keys_pressed)
         keyboard.wait(ESC_HOTKEY)
-
         self.end_keyboard_listener()
-        print("--Gui Again Usable--")
 
     def end_keyboard_listener(self):
-        if self.callback:
-            keyboard.unhook_all()
-
-        self.callback = None
+        keyboard.unhook_all()
 
 
 # Utilities to record hotkeys for the user
@@ -389,57 +228,80 @@ def constantly_check_keys_for_hotkeys():
     keyboard.wait(ESC_HOTKEY)
     events = keyboard.stop_recording()
     # This relies on the idea that there is a down strg and down esc at the end
+    # FIXME: MAKE REMOVE SPECIAL ESCAPE KEYS IF USED
     events.pop()
     events.pop()
     return events
 
 
+class SimultaneousKeyGroup:
+    """Captures simultaneously pressed keys"""
+
+    def __init__(self, key) -> None:
+        """initial key"""
+        self.events = [key]
+        self.start = key.start
+        self.end = key.end
+
+    def check_addl_key_for_overlap(self, additional_key):
+        """Used to check additional keys for overlap in the group"""
+        if additional_key.start <= self.end:
+            self._update(additional_key)
+            return True
+        return False
+
+    def _update(self, additional_key):
+        self.events.append(additional_key)
+        self.end = max(self.end, additional_key.end)
+
+
 def process_key_sequence(recorded) -> str:
-    """Creates a text version of a key sequence"""
+    """Creates a text version of a key sequence:"""
     for entry in recorded:
-        print(f"Code: {entry.scan_code}, Start: {entry.start}, End: {entry.end}")
+        print(
+            f"Code: {entry.scan_code}, Key: {entry.name}, Start: {entry.start}, End: {entry.end}"
+        )
 
-    # order by start time
-    sorted_keys = sorted(recorded, key=lambda x: x.start)
+    # Here we will look for simultaneous vs sequential key presses based on overlap =======================
+    conseq_key_groups = list()
 
-    matched = dict()
-    recorded_sequence = ""
-    # indexes wont change since moving from earliest start - can use index
-    for i, a_key in enumerate(sorted_keys):
-        for j, comparison_key in enumerate(sorted_keys[:i]):
-            # same key...but pressed earlier
-            if a_key.scan_code == comparison_key.scan_code:
-                # is it an extension of the same key press...
-                if a_key.start == comparison_key.end:
-                    sorted_keys.pop(i)
-                    continue
-                # if it is not an extension - we leave as is
-                else:
-                    pass
+    # order key events by start time
+    sorted_key_events = sorted(recorded, key=lambda x: x.start)
 
-            if a_key.start < comparison_key.end:
-                # log a_key as being with comparison key
-                curr = matched.get(j, [])
-                curr.append(a_key)
-                matched[j] = curr
-                sorted_keys.pop(i)
+    # list for key indexes to ignore - already processed
+    considered_keys = list()
 
-    for i, x in enumerate(sorted_keys):
-        if i in matched:
-            if i == 0:
-                recorded_sequence += x.name
-            else:
-                recorded_sequence += "," + x.name
-            for x in matched[i]:
-                recorded_sequence += "+" + str(x.name)
-        else:
-            if i == 0:
-                recorded_sequence += x.name
-            else:
-                recorded_sequence += "," + x.name
+    # Go through keys starting at front of time sequence by starts
+    for index_of_koi, key_of_interest in enumerate(sorted_key_events):
+        # if it was already a match, dont consider it - continue to next key in sequence
+        if key_of_interest in considered_keys:
+            continue
 
-    # print("Recorded:", recorded_sequence)
-    return recorded_sequence
+        new_key_group = SimultaneousKeyGroup(key_of_interest)
+
+        # we are considering this key - hereafter we will ignore it
+        considered_keys.append(key_of_interest)
+
+        # compare to all other keys with start following its start
+        following_key_events = sorted_key_events[index_of_koi + 1 :]
+        for index_of_compkey, comparison_key in enumerate(following_key_events):
+            if comparison_key in considered_keys:
+                continue
+
+            key_consumed = new_key_group.check_addl_key_for_overlap(comparison_key)
+            if key_consumed:
+                considered_keys.append(comparison_key)
+
+        conseq_key_groups.append(new_key_group)
+
+    def key_groups_to_strings(key_groups):
+        for key_group in key_groups:
+            key_names = list(set([key.name for key in key_group.events]))
+            group_string = "+".join(key_names)
+            yield group_string
+
+    # Return stringified version of events
+    return ",".join(key_groups_to_strings(conseq_key_groups))
 
 
 def record_sequence():
@@ -448,5 +310,4 @@ def record_sequence():
     events: list
     events = constantly_check_keys_for_hotkeys()
     repr_of_recording = process_key_sequence(recorded)
-    # repr_of_recording = process_key_sequence(events)
     return repr_of_recording, events
